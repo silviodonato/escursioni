@@ -34,7 +34,7 @@ Copiare i propri GPX/TCX in `tracce/`, eseguire `python3 genera_indice.py` e avv
 
 La configurazione attuale usa host, account e percorsi locali presenti nel codice. Per un’altra installazione adeguarli prima di abilitare la gestione.
 
-Pubblicare soltanto i file applicativi previsti, dopo i test e con backup esterno alla directory web. Non sincronizzare l’intera cartella del NAS e non usare cancellazioni automatiche sulla cartella delle tracce.
+Pubblicare soltanto i file applicativi previsti, dopo i test e con backup esterno alla directory web. Sul NAS i file CGI devono essere eseguibili: `chmod 755 aggiorna_indice.cgi gestisci_attivita.cgi sessione.cgi`. Il caricamento dal browser GitHub conserva il contenuto, ma può non conservare il permesso di esecuzione. Non sincronizzare l’intera cartella del NAS e non usare cancellazioni automatiche sulla cartella delle tracce.
 
 Nome e tipo sono visibili nella raccolta pubblica. Sessioni e cestino sono conservati fuori dal sito. Gli obiettivi mensili sono salvati nel browser.
 
