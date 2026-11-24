@@ -12,16 +12,16 @@ import genera_indice as generator
 def main():
     if os.environ.get('REQUEST_METHOD')!='POST':auth.reply(405,'Usa i pulsanti della raccolta attività.');return
     if not auth.direct_lan_request() or not auth.same_origin_request('manage-activity'):
-        auth.reply(403,'Gestione disponibile solo dalla rete di casa su silvionas.');return
+        auth.reply(403,'Gestione disponibile solo dalla rete di casa sull’indirizzo locale configurato.');return
     try:
-        if not auth.authenticated_owner():auth.reply(401,'Accedi a DSM come sdonato, poi riprova.');return
+        if not auth.authenticated_owner():auth.reply(401,'Accedi alla gestione con l’account proprietario, poi riprova.');return
         if os.environ.get('CONTENT_TYPE','').split(';')[0]!='application/json':raise ValueError('Richiesta non valida')
         length=int(os.environ.get('CONTENT_LENGTH','0'))
         if not 0<length<=24576:raise ValueError('Richiesta troppo grande o vuota')
         data=json.loads(sys.stdin.read(length))
         if not isinstance(data,dict):raise ValueError('Richiesta non valida')
         action=data.get('action')
-        with store.site_lock(HERE):
+        with store.site_lock(auth.HERE):
             ready=(store.STATE/'trash').is_dir()
             if action!='status' and not ready:raise store.Conflict('La gestione non è ancora disponibile.')
             if action=='status':result={'ready':ready,'trash':store.trash_items() if ready else [],'journal':store.journal() if ready else {}}

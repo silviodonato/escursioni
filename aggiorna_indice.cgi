@@ -13,10 +13,11 @@ import sys
 import tempfile
 from urllib.parse import urlsplit
 
-HERE = Path(__file__).resolve().parent
+RUNTIME = Path(__file__).resolve().parent
+sys.path.insert(0, str(RUNTIME))
+from activity_config import SITE, OWNER, HOSTS, NETWORKS
+HERE = SITE
 AUTHENTICATOR = '/usr/syno/synoman/webman/modules/authenticate.cgi'
-OWNER = 'sdonato'
-LAN = ipaddress.ip_network('192.168.1.0/24')
 
 
 def reply(status, message, **extra):
@@ -41,7 +42,7 @@ def same_origin_request(expected_action='update-index'):
     try:
         parsed = urlsplit(origin)
         return (parsed.scheme in ('http', 'https')
-                and parsed.hostname == 'silvionas'
+                and parsed.hostname in HOSTS
                 and parsed.netloc.lower() == host
                 and not parsed.path and not parsed.query and not parsed.fragment
                 and os.environ.get('HTTP_X_ESCURSIONI_ACTION') == expected_action)
@@ -57,7 +58,7 @@ def direct_lan_request():
         return False
     try:
         address = ipaddress.ip_address(os.environ.get('REMOTE_ADDR', ''))
-        return address in LAN or address.is_loopback
+        return any(address in network for network in NETWORKS) or (bool(NETWORKS) and address.is_loopback)
     except ValueError:
         return False
 
@@ -119,11 +120,11 @@ def main():
         reply(405, 'Usa il pulsante Aggiorna indice nella pagina delle escursioni.')
         return
     if not direct_lan_request() or not same_origin_request():
-        reply(403, 'Aggiornamento disponibile solo dalla rete di casa su http://silvionas/escursioni/.')
+        reply(403, 'Aggiornamento disponibile solo dalla rete di casa su l’indirizzo locale configurato.')
         return
     try:
         if not authenticated_owner():
-            reply(401, 'Accedi a DSM come sdonato, poi riprova.')
+            reply(401, 'Accedi alla gestione con l’account proprietario, poi riprova.')
             return
         regenerate()
     except subprocess.TimeoutExpired:

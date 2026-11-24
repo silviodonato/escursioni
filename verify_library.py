@@ -1,10 +1,16 @@
 import unittest,tempfile,json,io,os,contextlib,importlib.util,importlib.machinery
 from pathlib import Path
+import ipaddress
+import activity_config
+activity_config.OWNER='testowner'
+activity_config.HOSTS=('nas.test',)
+activity_config.NETWORKS=(ipaddress.ip_network('192.168.1.0/24'),)
 from unittest.mock import patch
 import activity_store as store
 import genera_indice as g
 loader=importlib.machinery.SourceFileLoader('management',str(Path(__file__).with_name('gestisci_attivita.cgi')))
 spec=importlib.util.spec_from_loader(loader.name,loader);api=importlib.util.module_from_spec(spec);loader.exec_module(api)
+api.auth.OWNER='testowner';api.auth.HOSTS=('nas.test',);api.auth.NETWORKS=activity_config.NETWORKS
 GPX='<gpx><trk><name>Original</name><trkseg><trkpt lat="44" lon="9"><time>2026-01-01T10:00:00Z</time></trkpt><trkpt lat="44.01" lon="9.01"><time>2026-01-01T10:10:00Z</time></trkpt></trkseg></trk></gpx>'
 class Management(unittest.TestCase):
  def setUp(self):
@@ -56,11 +62,11 @@ class Management(unittest.TestCase):
   out=io.StringIO()
   with patch.dict(os.environ,env,clear=True),patch.object(api.auth,'authenticated_owner',return_value=logged),patch.object(api.sys,'stdin',io.StringIO(body)),patch.object(store,'trash') as trash,contextlib.redirect_stdout(out):api.main()
   return out.getvalue(),trash.called
- def env(self):return dict(REQUEST_METHOD='POST',HTTP_HOST='silvionas',HTTP_ORIGIN='http://silvionas',HTTP_X_ESCURSIONI_ACTION='manage-activity',REMOTE_ADDR='192.168.1.42',CONTENT_TYPE='application/json',CONTENT_LENGTH='2')
+ def env(self):return dict(REQUEST_METHOD='POST',HTTP_HOST='nas.test',HTTP_ORIGIN='http://nas.test',HTTP_X_ESCURSIONI_ACTION='manage-activity',REMOTE_ADDR='192.168.1.42',CONTENT_TYPE='application/json',CONTENT_LENGTH='2')
  def test_anonymous_cannot_manage(self):
   result,called=self.request(self.env());self.assertIn('401 Unauthorized',result);self.assertFalse(called)
  def test_public_and_forged_sources_blocked(self):
-  for changes in [dict(HTTP_HOST='silvionas.tailb16deb.ts.net',HTTP_ORIGIN='https://silvionas.tailb16deb.ts.net'),dict(HTTP_X_FORWARDED_FOR='192.168.1.42'),dict(HTTP_ORIGIN='http://evil.test'),dict(REMOTE_ADDR='8.8.8.8'),dict(HTTP_X_ESCURSIONI_ACTION='update-index')]:
+  for changes in [dict(HTTP_HOST='public.example.test',HTTP_ORIGIN='https://public.example.test'),dict(HTTP_X_FORWARDED_FOR='192.168.1.42'),dict(HTTP_ORIGIN='http://evil.test'),dict(REMOTE_ADDR='8.8.8.8'),dict(HTTP_X_ESCURSIONI_ACTION='update-index')]:
    result,called=self.request(dict(self.env(),**changes),True);self.assertIn('403 Forbidden',result);self.assertFalse(called)
  def test_get_cannot_manage(self):
   result,called=self.request(dict(self.env(),REQUEST_METHOD='GET'),True);self.assertIn('405 Method Not Allowed',result);self.assertFalse(called)

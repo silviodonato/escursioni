@@ -14,3 +14,5 @@ __pycache__/
 sessions/
 _private/
 .DS_Store
+
+site_config.json

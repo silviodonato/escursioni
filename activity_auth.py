@@ -3,8 +3,7 @@ from pathlib import Path
 from http.cookies import SimpleCookie,CookieError
 import os,json,time,secrets,hashlib,re,stat,fcntl,urllib.request,urllib.parse
 
-STATE=Path('/var/services/homes/sdonato/.escursioni-library')
-OWNER='sdonato'
+from activity_config import STATE, OWNER
 COOKIE='escursioni_admin'
 TTL=1800
 API='http://127.0.0.1:5000/webapi/entry.cgi'

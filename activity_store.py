@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import os, json, hashlib, stat, tempfile, fcntl, uuid, shutil
 
-STATE = Path('/var/services/homes/sdonato/.escursioni-library')
+from activity_config import STATE
 KINDS = {'hiking':'Escursione','walking':'Camminata','running':'Corsa','cycling':'Ciclismo',
          'swimming':'Nuoto','skiing':'Sci','kayaking':'Kayak','sup':'SUP','surfing':'Surf',
          'elliptical':'Ellittica','workout':'Allenamento generico','other':'Altro'}

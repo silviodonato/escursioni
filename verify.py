@@ -5,6 +5,11 @@ import io
 import json
 import os
 from pathlib import Path
+import ipaddress
+import activity_config
+activity_config.OWNER='testowner'
+activity_config.HOSTS=('nas.test',)
+activity_config.NETWORKS=(ipaddress.ip_network('192.168.1.0/24'),)
 import subprocess
 import tempfile
 import unittest
@@ -14,9 +19,10 @@ loader = importlib.machinery.SourceFileLoader('handler', str(Path(__file__).with
 spec = importlib.util.spec_from_loader(loader.name, loader)
 handler = importlib.util.module_from_spec(spec)
 loader.exec_module(handler)
+handler.OWNER='testowner';handler.HOSTS=('nas.test',);handler.NETWORKS=activity_config.NETWORKS
 
-ENV = {'REQUEST_METHOD': 'POST', 'HTTP_HOST': 'silvionas',
-       'HTTP_ORIGIN': 'http://silvionas', 'HTTP_X_ESCURSIONI_ACTION': 'update-index',
+ENV = {'REQUEST_METHOD': 'POST', 'HTTP_HOST': 'nas.test',
+       'HTTP_ORIGIN': 'http://nas.test', 'HTTP_X_ESCURSIONI_ACTION': 'update-index',
        'REMOTE_ADDR': '192.168.1.42'}
 
 
@@ -39,7 +45,7 @@ class Checks(unittest.TestCase):
         self.assertFalse(called)
 
     def test_no_cross_site_execution(self):
-        for origin in ('http://other.example', 'null', '', 'http://silvionas.evil.example'):
+        for origin in ('http://other.example', 'null', '', 'http://nas.test.evil.example'):
             output, called = request(dict(ENV, HTTP_ORIGIN=origin), True)
             self.assertIn('403 Forbidden', output)
             self.assertFalse(called)
@@ -57,10 +63,10 @@ class Checks(unittest.TestCase):
         self.assertFalse(called)
 
     def test_only_owner_allowed(self):
-        for username, code in ((b'sdonato\n', 0), (b'other\n', 0), (b'', 5), (b'sdonato', 5)):
+        for username, code in ((b'testowner\n', 0), (b'other\n', 0), (b'', 5), (b'testowner', 5)):
             result = subprocess.CompletedProcess([], code, stdout=username)
             with patch.dict(os.environ, {'HTTP_COOKIE': 'id=test-session'}, clear=True), patch.object(handler.subprocess, 'run', return_value=result):
-                self.assertEqual(handler.authenticated_owner(), username.strip() == b'sdonato' and code == 0)
+                self.assertEqual(handler.authenticated_owner(), username.strip() == b'testowner' and code == 0)
 
     def test_missing_cookie_does_not_start_authenticator(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(handler.subprocess, 'run') as run:

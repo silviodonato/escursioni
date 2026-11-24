@@ -32,7 +32,7 @@ Copiare i propri GPX/TCX in `tracce/`, eseguire `python3 genera_indice.py` e avv
 
 ## Pubblicazione sul NAS
 
-La configurazione attuale usa host, account e percorsi locali presenti nel codice. Per un’altra installazione adeguarli prima di abilitare la gestione.
+Host, account e percorsi vengono letti da `site_config.json`, escluso da Git e conservato accanto ai file Python reali nella cartella privata delle versioni, fuori dalla directory web. Il file di esempio contiene soltanto valori illustrativi. Senza configurazione, la gestione resta disabilitata.
 
 Pubblicare soltanto i file applicativi previsti, dopo i test e con backup esterno alla directory web. Sul NAS i file CGI devono essere eseguibili: `chmod 755 aggiorna_indice.cgi gestisci_attivita.cgi sessione.cgi`. Il caricamento dal browser GitHub conserva il contenuto, ma può non conservare il permesso di esecuzione. Non sincronizzare l’intera cartella del NAS e non usare cancellazioni automatiche sulla cartella delle tracce.
 
@@ -51,3 +51,18 @@ Preferiti, note ed etichette sono in `journal.json` nella cartella privata già 
 Il primo aggiornamento aggiunge gli approfondimenti alle voci già indicizzate, senza ricalcolare dislivello e altre statistiche precedenti. Le esecuzioni successive riutilizzano la cache: nessuna rilettura dei file invariati.
 
 Se un GPX già indicizzato ha XML non valido, le statistiche esistenti restano disponibili; il controllo viene segnalato e memorizzato. Non si ripete la lettura finché il file non cambia.
+
+
+## Aggiornamento del sito da GitHub
+
+“Aggiorna sito” compare durante la gestione autenticata sulla rete locale. “Controlla aggiornamenti” legge il ramo `main` del repository pubblico configurato e ammette soltanto un commit con workflow `.github/workflows/tests.yml` riuscito per quel commit, ramo ed evento push. Il pulsante mostra la versione prima di installarla. Nessuna credenziale GitHub viene conservata.
+
+L’archivio viene scaricato per SHA preciso da codeload.github.com, con verifica TLS, limiti di dimensione e rifiuto di percorsi pericolosi, collegamenti simbolici e file applicativi duplicati. Viene installata soltanto la lista di file applicativi prevista in `website_update.py`. Si controllano hash, sintassi Python e import del generatore con il Python del NAS, senza elaborare attività.
+
+Il NAS conserva le versioni in una sottocartella privata `site-updates/releases/` e cambia il collegamento `current` con un’operazione atomica. Il sito pubblico contiene collegamenti ai singoli file applicativi; **nessun collegamento pubblico a una directory privata**. La configurazione, le sessioni, i metadati e gli archivi restano fuori dalla directory web. Tracce e indice restano nella directory originale. La versione precedente è conservata e verificata prima del ripristino. Le versioni più vecchie non vengono eliminate automaticamente: occupano spazio finché il proprietario non le rimuove manualmente.
+
+Il servizio web può modificare le versioni applicative nella cartella privata già autorizzata. Questo permette gli aggiornamenti, ma un servizio web compromesso potrebbe anche alterare il codice del sito. Non ottiene permessi di amministrazione DSM. Il blocco condiviso impedisce aggiornamenti durante generazione dell’indice o gestione dei file.
+
+Il bootstrap di recupero (`aggiorna_sito.cgi`, `website_update.py` e le copie dei moduli di autenticazione/configurazione necessari) è installato in una cartella separata, leggibile dal servizio web e scrivibile soltanto dal proprietario. **Non viene aggiornato dal pulsante**: le correzioni a questi componenti richiedono installazione manuale del proprietario. Così il ripristino resta disponibile anche se una versione applicativa è difettosa. I test automatici riducono gli errori, ma non garantiscono l’assenza di difetti: verificare il sito dopo ogni aggiornamento e usare il ripristino se necessario.
+
+Per una prima installazione mantenere un backup esterno del sito, creare la configurazione privata, copiare una versione completa nella cartella privata e predisporre i collegamenti pubblici ai soli file applicativi. La proprietà del bootstrap e della directory web deve impedire al servizio web di sostituirli. Non usare copie ricorsive della cartella del NAS verso GitHub.

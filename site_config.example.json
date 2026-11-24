@@ -1,0 +1,8 @@
+{
+  "owner": "owner_account",
+  "admin_hosts": ["nas.test"],
+  "lan_networks": ["192.0.2.0/24"],
+  "site_dir": "/srv/activities",
+  "state_dir": "/srv/activities-private",
+  "repository": "YOUR_GITHUB_ACCOUNT/YOUR_REPOSITORY"
+}

@@ -8,7 +8,8 @@ import xml.etree.ElementTree as ET
 from activity_store import decorate
 import activity_metrics
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+from activity_config import SITE
+HERE = str(SITE)
 TRACCE = os.path.join(HERE, "tracce")
 OUT = os.path.join(TRACCE, "index.json")
 
