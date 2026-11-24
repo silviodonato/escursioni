@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="activity-tools.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -98,6 +99,15 @@ h2{font-family:var(--font-d);font-weight:600;font-size:22px;margin:34px 0 10px}
 .stat .v small{font-size:14px;font-family:var(--font-b);color:var(--ink2);margin-left:3px}
 .stat .l{color:var(--ink2);font-size:13px;margin-top:2px}
 
+/* details */
+.details{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin:0 0 16px}
+.details dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 22px;margin:0}
+.details dt{color:var(--ink2);font-size:12px}
+.details dd{margin:0;font-size:14px;overflow-wrap:anywhere}
+.details dd .muted{color:var(--ink2)}
+.details a{color:var(--sea)}
+.kind-badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:0 9px;font-size:13px;background:var(--bg)}
+
 /* charts */
 .charts{display:grid;gap:14px}
 .chart{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:10px 12px 6px}
@@ -157,6 +167,7 @@ footer{color:var(--ink2);font-size:12px;padding-bottom:28px}
 
 <nav style="display:flex;justify-content:space-between;align-items:center;gap:14px;margin:0 0 18px;flex-wrap:wrap"><a class="btn" id="back-library" href="./" style="text-decoration:none">← Tutte le attività</a><a class="btn" id="download-activity" hidden download style="text-decoration:none">Scarica il file originale</a></nav>
 <p id="activity-status" role="status" aria-live="polite" style="color:var(--ink2)"></p>
+<section class="details" id="activity-details" aria-label="Dettagli dell’attività" hidden><dl id="details-list"></dl></section>
 <section id="activity-information" hidden style="padding:24px;background:var(--bg2);border:1px solid var(--line);border-radius:14px"></section>
 <div id="activity-visual">
 <section class="hero" aria-label="Mappa del percorso">
@@ -473,7 +484,7 @@ function parseGPX(text){const doc=new DOMParser().parseFromString(text,'applicat
     const el=e.getElementsByTagName('ele')[0],tm=e.getElementsByTagName('time')[0];
     const t=tm?Date.parse(tm.textContent)/1000:(t0||0)+k;if(t0===null)t0=t;
     pts.push([la,lo,el?+el.textContent:0,Math.round(t-t0),Math.round(d),Math.round(ext(e,'hr')),ext(e,'speed'),Math.round(ext(e,'cad'))]);}
-  return {t0,name:name.trim(),pts};}
+  return {t0,name:name.trim(),pts,device:(doc.documentElement.getAttribute('creator')||'').trim()};}
 function parseActivity(text,file){
   if(/\.fit$/i.test(file))throw new Error('Converti prima il FIT in GPX con GPSBabel (vedi le istruzioni sotto).');
   if(!/\.tcx$/i.test(file))return parseGPX(text);
@@ -496,14 +507,15 @@ function parseActivity(text,file){
     pts.push([lat,lon,Number(value(e,'AltitudeMeters'))||0,Math.round(t-t0),Math.round(d),hr,Number(value(e,'Speed'))||0,cad<255?cad:0]);
   }
   if(pts.length<2)throw new Error('Questa attività non contiene una traccia GPS.');
-  return {t0,name:value(doc,'Name')||value(doc,'Notes')||'Attività TCX',pts};
+  const creator=all(doc,'Creator')[0];
+  return {t0,name:value(doc,'Name')||value(doc,'Notes')||'Attività TCX',pts,device:creator?(value(creator,'Name')||'').trim():''};
 }
 let curRaw=null;
 function load(raw){$('activity-visual').hidden=false;$('activity-information').hidden=true;curRaw=raw;D=process(raw);fitted=false;cur=-1;sel=null;stop();view={a:0,b:D.n-1};$('zoom-out').hidden=true;renderRange();const dateIt=new Date(D.t[0]*1000).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});const nm=(raw.name||'').trim();const generic=!nm||/^(track|activity|zepp|workout|untitled|gpx|hike|walk)/i.test(nm)||/\.gpx$/i.test(nm)||/^\d{8,}/.test(nm);
   $('title').innerHTML=generic?`Escursione <em>${dateIt}</em>`:nm.replace(/</g,'&lt;');document.title=$('title').textContent;
   $('hrmax').value=D.hrMax||190;$('hrmax-note').textContent=D.hrMax?`(la massima registrata; cambiala se conosci la tua)`:'';
   renderStats();renderSplits();renderClimbs();renderPauses();renderZones();drawAll();setCursor(-1);}
-function handleFile(f){if(!f)return;f.text().then(t=>{try{load(parseActivity(t,f.name));window.scrollTo({top:0,behavior:'smooth'});}catch(err){$('drop').textContent='Non sono riuscito a leggere il file: '+err.message;}});}
+function handleFile(f){if(!f)return;f.text().then(t=>{try{const raw=parseActivity(t,f.name);load(raw);renderDetails(null,raw);window.scrollTo({top:0,behavior:'smooth'});}catch(err){$('drop').textContent='Non sono riuscito a leggere il file: '+err.message;}});}
 $('file').addEventListener('change',e=>handleFile(e.target.files[0]));
 const drop=$('drop');['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
@@ -515,6 +527,29 @@ const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<
 const fmtDate=iso=>iso?new Date(iso).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'}):'Data non disponibile';
 function trackLabel(t){if(t.display_name)return t.display_name;const nm=(t.name||'').trim();if(!nm||/^(track|activity|zepp|workout|untitled|gpx|hike|walk)/i.test(nm)||/^\d{8,}/.test(nm))return t.date?'Attività del '+fmtDate(t.date):t.file;return /^(Escursione|Corsa|Ciclismo|Nuoto|Camminata|Attività)$/.test(nm)&&t.date?nm+' del '+fmtDate(t.date):nm;}
 const back=new URLSearchParams(location.search).get('back');if(back&&back.startsWith('?')&&back.length<3000)$('back-library').href='./'+back;
+const QUALITY={invalid_gps:'punti GPS non validi',gps_jumps:'salti GPS sospetti',clock_errors:'orari non crescenti',missing_time:'punti senza orario',gaps:'intervalli oltre 2 minuti'};
+const fmtSize=b=>b>=1048576?num(b/1048576,1)+' MB':num(Math.max(1,b/1024))+' kB';
+function renderDetails(meta,raw){
+ const KINDS=(window.ActivityTools||{}).KINDS||{},rows=[],add=(label,html)=>{if(html)rows.push(`<div><dt>${label}</dt><dd>${html}</dd></div>`);};
+ meta=meta||{};
+ add('Nome',escapeHtml(meta.file?trackLabel(meta):(raw&&raw.name)||''));
+ if(meta.file){const kind=KINDS[meta.kind]||KINDS.other||'Altro';add('Tipo di attività',`<span class="kind-badge">${escapeHtml(kind)}</span>`+(meta.sport?` <span class="muted">· registrata come “${escapeHtml(meta.sport)}”</span>`:''));}
+ const start=raw&&D?D.t[0]:(meta.date?Date.parse(meta.date)/1000:NaN);
+ if(Number.isFinite(start)){const day=new Date(start*1000).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  add('Data',escapeHtml(day)+(raw&&D?` <span class="muted">· ${fmtClock(D.t[0])} – ${fmtClock(D.t[D.n-1])}</span>`:''));}
+ const pt=meta.start||(raw&&raw.pts&&raw.pts[0]);
+ if(pt&&Number.isFinite(+pt[0])&&Number.isFinite(+pt[1])){const la=(+pt[0]).toFixed(5),lo=(+pt[1]).toFixed(5);add('Punto di partenza',`<a href="https://www.openstreetmap.org/?mlat=${la}&mlon=${lo}#map=15/${la}/${lo}" target="_blank" rel="noopener">${num(+la,5)}, ${num(+lo,5)}</a>`);}
+ if(meta.ele_min!=null&&meta.ele_max!=null)add('Quota minima – massima',num(meta.ele_min)+' – '+num(meta.ele_max)+' m');
+ if(raw&&raw.device)add('Dispositivo o app',escapeHtml(raw.device));
+ if(meta.file)add('File',escapeHtml(meta.file)+` <span class="muted">· ${escapeHtml(meta.format||'GPX')}${meta.size?' · '+fmtSize(meta.size):''}</span>`);
+ else if(raw)add('File','<span class="muted">aperto dal tuo computer, non salvato nel sito</span>');
+ const points=meta.points||(raw&&raw.pts&&raw.pts.length);
+ if(points)add('Punti registrati',num(points)+(meta.routes&&meta.routes.length>1?` <span class="muted">· ${meta.routes.length} segmenti separati</span>`:''));
+ const ef=meta.efforts||{},best=['1000','5000','10000'].filter(k=>ef[k]&&ef[k].seconds).map(k=>`${+k/1000} km <b>${fmtTime(ef[k].seconds)}</b>`);
+ if(best.length)add('Tempi GPS stimati',best.join(' · '));
+ if(meta.file&&meta.quality){const q=meta.quality,issues=q.xml_error?['XML non valido']:Object.keys(QUALITY).filter(k=>q[k]).map(k=>num(q[k])+' '+QUALITY[k]);
+  add('Qualità dei dati',issues.length?escapeHtml(issues.join(', ')):'Nessun problema rilevato');}
+ $('details-list').innerHTML=rows.join('');$('activity-details').hidden=!rows.length;}
 async function openTrack(file){
  const status=$('activity-status');status.textContent='Caricamento attività…';let effortMessage='';
  try{
@@ -522,16 +557,16 @@ async function openTrack(file){
   const download=$('download-activity');download.href='tracce/'+encodeURIComponent(file);download.download=file;download.hidden=false;
   if(meta.has_gps===false){
    $('activity-visual').hidden=true;$('activity-information').hidden=false;$('title').textContent=trackLabel(meta);document.title=trackLabel(meta);$('subtitle').textContent=fmtDate(meta.date);
-   $('activity-information').innerHTML='<h2 style="margin-top:0">Attività senza traccia GPS</h2><p>Questo file contiene i dati dell’attività ma non un percorso da mostrare sulla mappa.</p><p><b>'+num(meta.km,2)+' km</b>'+(meta.dur_s?' · '+fmtTime(meta.dur_s):'')+' · '+escapeHtml(meta.format||'TCX')+'</p>';
+   $('activity-information').innerHTML='<h2 style="margin-top:0">Attività senza traccia GPS</h2><p>Questo file contiene i dati dell’attività ma non un percorso da mostrare sulla mappa.</p><p><b>'+num(meta.km,2)+' km</b>'+(meta.dur_s?' · '+fmtTime(meta.dur_s):'')+' · '+escapeHtml(meta.format||'TCX')+'</p>';renderDetails(meta,null);
   }else{
-   const r=await fetch('tracce/'+encodeURIComponent(file),{cache:'no-store'});if(!r.ok)throw Error('File non disponibile. Torna alla raccolta e aggiorna l’elenco.');const raw=parseActivity(await r.text(),file);raw.name=trackLabel(meta);load(raw);
+   const r=await fetch('tracce/'+encodeURIComponent(file),{cache:'no-store'});if(!r.ok)throw Error('File non disponibile. Torna alla raccolta e aggiorna l’elenco.');const raw=parseActivity(await r.text(),file);raw.name=trackLabel(meta);load(raw);renderDetails(meta,raw);
    const distance=new URLSearchParams(location.search).get('effort'),effort=['1000','5000','10000'].includes(distance)&&meta.efforts?.[distance];
    if(effort){const from=Date.parse(effort.start)/1000,to=Date.parse(effort.end)/1000;if(Number.isFinite(from)&&Number.isFinite(to)&&to>from){const nearest=time=>D.t.reduce((best,t,i)=>Math.abs(t-time)<Math.abs(D.t[best]-time)?i:best,0),i=nearest(from),j=nearest(to);if(i<j&&Math.abs(D.t[i]-from)<=120&&Math.abs(D.t[j]-to)<=120){setSel(i,j);effortMessage='Tratto GPS di '+(+distance/1000)+' km evidenziato · '+fmtTime(effort.seconds)+'. La selezione usa i punti registrati più vicini agli estremi interpolati.';}}}
 
   }
   curFile=file;status.textContent=effortMessage;
   if(decodeURIComponent(location.hash.slice(1))!==file)history.replaceState(null,'',location.pathname+location.search+'#'+encodeURIComponent(file));
- }catch(error){$('activity-visual').hidden=true;$('activity-information').hidden=true;$('download-activity').hidden=true;$('title').textContent='Attività non disponibile';$('subtitle').textContent='';status.textContent=error.message;}
+ }catch(error){$('activity-visual').hidden=true;$('activity-information').hidden=true;$('activity-details').hidden=true;$('download-activity').hidden=true;$('title').textContent='Attività non disponibile';$('subtitle').textContent='';status.textContent=error.message;}
 }
 async function loadIndex(){try{
  const r=await fetch('tracce/index.json',{cache:'no-store'});if(!r.ok)throw Error('Elenco non disponibile. Torna alla raccolta e riprova.');TRACKS=await r.json();if(!Array.isArray(TRACKS))throw Error('Elenco non valido.');const file=decodeURIComponent(location.hash.slice(1))||(TRACKS[0]||{}).file;if(file)await openTrack(file);else $('activity-status').textContent='La raccolta è vuota.';
