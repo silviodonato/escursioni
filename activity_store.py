@@ -2,7 +2,7 @@
 from pathlib import Path
 from contextlib import contextmanager
 from datetime import datetime, timezone
-import os, json, hashlib, stat, tempfile, fcntl, uuid, shutil
+import os, sys, csv, json, hashlib, stat, tempfile, fcntl, uuid, shutil
 
 from activity_config import STATE
 KINDS = {'hiking':'Escursione','walking':'Camminata','running':'Corsa','cycling':'Ciclismo',
@@ -40,13 +40,72 @@ def infer_kind(entry):
     if 'kayak' in name:return 'kayaking'
     return 'other'
 
+# Strava activity types (Italian and English exports) mapped to the kinds of the collection.
+STRAVA_KINDS = {
+    'escursione':'hiking','hike':'hiking','camminata':'walking','walk':'walking',
+    'corsa':'running','run':'running','trail run':'running','corsa su sentiero':'running',
+    'virtual run':'running','corsa virtuale':'running',
+    'ciclismo':'cycling','ride':'cycling','giro in bici':'cycling','mountain bike ride':'cycling',
+    'giro in mountain bike':'cycling','gravel ride':'cycling','giro in bici gravel':'cycling',
+    'e-bike ride':'cycling','giro in e-bike':'cycling','virtual ride':'cycling',
+    'giro virtuale':'cycling','velomobile':'cycling',
+    'nuotata':'swimming','nuoto':'swimming','swim':'swimming',
+    'sci alpino':'skiing','alpine ski':'skiing','sci nordico':'skiing','nordic ski':'skiing',
+    'sci alpinismo':'skiing','backcountry ski':'skiing',
+    'kayak':'kayaking','kayaking':'kayaking','canoa':'kayaking','canoeing':'kayaking',
+    'stand up paddle':'sup','stand up paddling':'sup','surf':'surfing','surfing':'surfing',
+    'ellittica':'elliptical','elliptical':'elliptical',
+    'allenamento generico':'workout','workout':'workout','allenamento con i pesi':'workout',
+    'weight training':'workout','yoga':'workout',
+}
+STRAVA_COLUMNS = (('nome attività','activity name'), ('tipo attività','activity type'),
+                  ('nome del file','filename'))
+STRAVA_POSITIONS = (2, 3, 12)  # column order of the Strava export, used if headers are unknown
+
+
+def strava_catalog(path=None):
+    """Names and types from the activities.csv of a Strava export, by file number.
+
+    The CSV stays in the private folder: it also holds descriptions and private notes,
+    which are never read. Returns {} when the file is missing or unreadable."""
+    path = Path(path) if path else STATE / 'strava_activities.csv'
+    try:
+        with path.open(encoding='utf-8-sig', newline='') as source:
+            rows = csv.reader(source)
+            header = [h.strip().casefold() for h in next(rows, [])]
+            columns = []
+            for names, position in zip(STRAVA_COLUMNS, STRAVA_POSITIONS):
+                found = [header.index(n) for n in names if n in header]
+                columns.append(found[0] if found else position)
+            catalog = {}
+            for row in rows:
+                if len(row) <= max(columns):
+                    continue
+                name, kind, file = (row[i].strip() for i in columns)
+                file = file.replace('\\', '/').rsplit('/', 1)[-1]
+                if file.lower().endswith('.gz'):
+                    file = file[:-3]
+                stem = os.path.splitext(file)[0].casefold()
+                if stem and not stem.startswith('.'):
+                    catalog[stem] = {'name': name[:160], 'type': kind[:80]}
+            return catalog
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeDecodeError, csv.Error) as error:
+        print('elenco Strava non letto: {}'.format(error), file=sys.stderr)
+        return {}
+
+
 def decorate(entries, custom=None):
     custom=overrides() if custom is None else custom
     for entry in entries:
         change=custom.get(entry['file'],{})
+        strava=entry.get('strava') if isinstance(entry.get('strava'),dict) else {}
         if change.get('name'):entry['display_name']=change['name']
+        elif strava.get('name'):entry['display_name']=strava['name']
         else:entry.pop('display_name',None)
-        entry['kind']=change.get('kind') if change.get('kind') in KINDS else infer_kind(entry)
+        if change.get('kind') in KINDS:entry['kind']=change['kind']
+        else:entry['kind']=STRAVA_KINDS.get(str(strava.get('type') or '').casefold()) or infer_kind(entry)
     return entries
 
 @contextmanager

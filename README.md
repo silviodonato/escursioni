@@ -15,6 +15,10 @@ for check in verify_*.cjs; do node "$check"; done
 
 Copiare i propri GPX/TCX in `tracce/`, eseguire `python3 genera_indice.py` e avviare `python3 -m http.server`. Convertire i FIT in GPX; gli originali possono essere conservati accanto al file convertito. Se accanto a un GPX c’è un FIT con lo stesso nome, il tipo di attività (kayak, corsa, escursione…) viene letto dal FIT, perché i GPX convertiti non lo contengono. L’anteprima http.server mostra il sito in lettura; la gestione richiede CGI Python su DSM.
 
+### Nomi e tipi da un export di Strava
+
+Copiare `activities.csv` dell’export di Strava nella cartella privata (`state_dir` di `site_config.json`; senza configurazione `~/.escursioni-library/`) con il nome `strava_activities.csv`, **mai in `tracce/` o nella directory web**: contiene anche descrizioni e note private. Al successivo aggiornamento dell’indice ogni file numerato come nell’export (`21295057161.gpx`, `.tcx`…) prende nome e tipo da Strava; vengono letti solo nome, tipo e nome del file. Nome e tipo scelti nella gestione restano prioritari; i tipi Strava senza corrispondenza (es. “Sport acquatico”) usano lo sport registrato dal dispositivo. Togliendo il file si torna ai nomi originali.
+
 ## Struttura
 
 - `index.html`, `library.js`, `library.css`: raccolta, filtri e gestione.
