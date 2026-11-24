@@ -11,5 +11,12 @@ function heatCells(rows,cell=250){const cells=new Map();
  }
  return [...cells.values()];
 }
-const api={project,unproject,heatCells};if(typeof module==='object'&&module.exports)module.exports=api;else root.AtlasTools=api;
+/* Heat colouring: routes are stroked with a small alpha so overlaps accumulate; each pixel's
+   alpha is turned back into a number of passages and mapped to a green-amber-red palette. */
+const STEP=.06,KEEP=Math.log(1-STEP),STOPS=[[0,[106,44,200]],[.5,[245,130,0]],[1,[220,16,40]]];
+const PALETTE=Array.from({length:256},(_,i)=>{const t=i/255,k=t<.5?0:1,[a,ca]=STOPS[k],[b,cb]=STOPS[k+1],f=(t-a)/(b-a);return ca.map((v,j)=>Math.round(v+(cb[j]-v)*f));});
+function passages(alpha){return alpha?Math.log(1-Math.min(alpha,254)/255)/KEEP:0;}
+function heatColor(alpha,max){const n=passages(alpha);if(!n)return [0,0,0,0];const t=Math.min(1,Math.log1p(n)/Math.log1p(Math.max(2,max))),c=PALETTE[Math.round(t*255)];return [c[0],c[1],c[2],Math.round(255*(.8+.2*t)*Math.min(1,n))];}
+function lineWidth(zoom){return Math.max(3,Math.min(12,zoom*1.3-10));}
+const api={project,unproject,heatCells,STEP,passages,heatColor,lineWidth};if(typeof module==='object'&&module.exports)module.exports=api;else root.AtlasTools=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
