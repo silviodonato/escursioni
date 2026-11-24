@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),A=require('./analysis-tools.js');
+const now=new Date('2026-11-24T12:00:00Z');let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++;};
+const rows=[{file:'a',date:'2026-11-01T12:00:00Z',km:10,gain:100,dur_s:3600},{file:'b',date:'2026-11-07T12:00:00Z',km:5,gain:50,dur_s:1800},{file:'c',date:'2026-11-24T12:00:00Z',km:20,gain:200,dur_s:7200},{file:'d',date:'2026-10-31T12:00:00Z',km:2},{file:'e',date:'2025-11-24T12:00:00Z',km:30},{file:'f',date:'2025-11-25T12:00:00Z',km:999},{file:'g',date:'2025-12-10T12:00:00Z',km:100},{file:'future',date:'2126-01-01',km:9999}];
+let weeks=A.weeklyBins(rows,'km','','',now);eq(weeks.length,12);eq(weeks[0].from,'2026-09-07');eq(weeks[11].from,'2026-11-23');eq(weeks[11].to,'2026-11-24');eq(weeks.reduce((s,b)=>s+b.value,0),37);
+weeks=A.weeklyBins(rows,'count','2026-11-01','2026-11-30',now);eq(weeks.length,5);eq(weeks[0].from,'2026-11-01');eq(weeks[0].to,'2026-11-01');eq(weeks.reduce((s,b)=>s+b.value,0),3);
+eq(A.weeklyBins(rows,'km','2026-12-01','2026-12-31',now),[]);
+weeks=A.weeklyBins(rows,'km','2026-11-07','2026-11-07',now);eq(weeks.length,1);eq(weeks[0].value,5);eq(weeks[0].from,'2026-11-07');eq(weeks[0].to,'2026-11-07');
+let years=A.annualComparison(rows,2026,'km',now);eq(years.current,37);eq(years.previous,30);eq(years.previousLimit,'2025-11-24');eq(years.bins[11].current,null);eq(years.bins[10].current,37);eq(years.bins[10].previous,30);eq(years.previousCount,1);
+years=A.annualComparison(rows,2025,'km',now);eq(years.current,1129);eq(years.previous,0);eq(years.bins[11].current,1129);
+years=A.annualComparison([{date:'2024-02-29',km:1},{date:'2023-02-28',km:2},{date:'2023-03-01',km:5}],2024,'km',new Date('2024-02-29T12:00:00Z'));eq(years.current,1);eq(years.previous,2);eq(years.previousLimit,'2023-02-28');
+eq(A.speed({km:10,dur_s:3600}),10);eq(A.pace({km:10,dur_s:3600}),360);eq(A.speed({km:0,dur_s:3600}),0);eq(A.pace({km:0,dur_s:3600}),null);eq(A.speed({km:10,dur_s:0}),null);eq(A.numeric(true),null);eq(A.numeric(''),null);eq(A.numeric(-1),null);eq(A.numeric('NaN'),null);eq(A.numeric('12.3'),12.3);
+eq(A.routes({routes:[[[44,9],[44,9.1]],[[45,10],[45,10.1]]]}).length,2);
+eq(A.routes({routes:[[[44,9],[null,9.1],[44,9.2]],[[999,10],[45,10.1]]]}),[]);
+eq(A.routes({routes:[[[44,9],[44,9.1],[999,9],[45,10],[45,10.1]]]}).length,2);
+eq(A.csvCell('=SUM(A1)'),"\"'=SUM(A1)\"");eq(A.csvCell(' \t+2'),"\"' \t+2\"");eq(A.csvCell('@cmd'),"\"'@cmd\"");eq(A.csvCell('a"b;\nc'),'"a""b;\nc"');
+const csv=A.csv([{file:'a.gpx',name:'=1+1',date:null,kind:'run',km:1.5,gain:0,dur_s:60}],{kind:()=> 'Corsa'});
+eq(csv.startsWith('\ufeff"Nome";"File"'),true);eq(csv.includes('"\'=1+1"'),true);eq(csv.includes('"1,5";"0";"60"'),true);eq(csv.endsWith('\r\n'),true);eq(rows[0].file,'a');
+console.log(n+' analysis checks passed: clipped weeks, annual cutoffs, leap days, pace/speed, segmented maps and spreadsheet-safe CSV.');

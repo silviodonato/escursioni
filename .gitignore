@@ -1,0 +1,16 @@
+tracce/
+*.gpx
+*.tcx
+*.fit
+*.csv
+*.png
+*.sock
+.env
+.env.*
+.escursioni*
+__pycache__/
+*.pyc
+*.tmp
+sessions/
+_private/
+.DS_Store
