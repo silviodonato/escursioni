@@ -148,6 +148,93 @@ def gpx_data(txt):
         if coords:segments.append(coords)
     return name,pts,segments
 
+# FIT sport codes (Garmin FIT profile) mapped to the names activity_store.infer_kind knows.
+FIT_SPORTS = {1:'running', 2:'cycling', 5:'swimming', 10:'workout', 11:'walking',
+              12:'skiing', 13:'alpineski', 16:'hiking', 17:'hiking', 21:'cycling',
+              37:'standuppaddling', 38:'surfing', 41:'kayaking'}
+FIT_FIELDS = {12: (0, 1), 18: (5, 6), 19: (25, 39)}  # sport, session, lap: (sport, sub_sport)
+FIT_LIMIT = 64 * 1024 * 1024
+
+
+def fit_sport(raw):
+    """Sport recorded in a FIT file, or None. Reads only the sport/session/lap messages."""
+    if len(raw) < 12 or raw[8:12] != b'.FIT' or raw[0] not in (12, 14):
+        raise ValueError('file FIT non valido')
+    end = min(len(raw), raw[0] + int.from_bytes(raw[4:8], 'little'))
+    pos, layouts, found = raw[0], {}, {}
+    try:
+        while pos < end:
+            record = raw[pos]; pos += 1
+            if record & 0x80:  # compressed timestamp header: always a data message
+                local, definition = (record >> 5) & 3, False
+            else:
+                local, definition = record & 0x0F, bool(record & 0x40)
+            if definition:
+                order = 'big' if raw[pos+1] == 1 else 'little'
+                number = int.from_bytes(raw[pos+2:pos+4], order)
+                count = raw[pos+4]; pos += 5; fields = []; size = 0
+                for _ in range(count):
+                    fields.append((raw[pos], size, raw[pos+1])); size += raw[pos+1]; pos += 3
+                if record & 0x20:  # developer fields
+                    extra = raw[pos]; pos += 1
+                    size += sum(raw[pos+3*i+1] for i in range(extra)); pos += 3*extra
+                layouts[local] = (number, fields, size)
+                continue
+            if local not in layouts:
+                raise ValueError('messaggio FIT senza definizione')
+            number, fields, size = layouts[local]
+            data = raw[pos:pos+size]; pos += size
+            if len(data) < size:
+                raise ValueError('file FIT troncato')
+            wanted = FIT_FIELDS.get(number)
+            if wanted and number not in found:
+                values = {num: data[offset] for num, offset, length in fields if num in wanted and length}
+                if values.get(wanted[0], 0xFF) != 0xFF:
+                    found[number] = (values[wanted[0]], values.get(wanted[1], 0xFF))
+                    if number == 12:
+                        break
+    except IndexError:
+        raise ValueError('file FIT troncato')
+    for number in (12, 18, 19):
+        if number in found:
+            sport, sub_sport = found[number]
+            if sport == 4 and sub_sport == 15:
+                return 'elliptical'
+            return FIT_SPORTS.get(sport)
+    return None
+
+
+def apply_fit_sports(entries, names):
+    """GPX files carry no sport: take it from a FIT original with the same name, if present."""
+    fits = {os.path.splitext(n)[0].casefold(): n for n in names if n.lower().endswith('.fit')}
+    for entry in entries:
+        if not entry['file'].lower().endswith('.gpx'):
+            continue
+        fit = fits.get(os.path.splitext(entry['file'])[0].casefold())
+        if not fit:
+            entry.pop('_fit', None); entry['sport'] = None
+            continue
+        try:
+            info = os.stat(os.path.join(TRACCE, fit))
+            key = dict(file=fit, size=info.st_size, mtime_ns=info.st_mtime_ns)
+            cached = entry.get('_fit')
+            if not (isinstance(cached, dict) and all(cached.get(k) == v for k, v in key.items())):
+                sport = None
+                if info.st_size <= FIT_LIMIT:
+                    with open(os.path.join(TRACCE, fit), 'rb') as source:
+                        raw = source.read(FIT_LIMIT + 1)
+                    try:
+                        sport = fit_sport(raw)
+                    except ValueError as error:
+                        print('sport non letto da {}: {}'.format(fit, error), file=sys.stderr)
+                cached = dict(key, sport=sport)
+            entry['_fit'] = cached
+            entry['sport'] = cached['sport']
+        except OSError as error:
+            # Keep the previous result; retried at the next update (e.g. FIT still being copied).
+            print('sport non letto da {}: {}'.format(fit, error), file=sys.stderr)
+
+
 # Increase this when changing the track-statistics algorithm.
 CACHE_VERSION = 2
 
@@ -274,6 +361,7 @@ def main(web_acl=False, max_files=None, max_seconds=None):
             if cached:
                 out.append(cached)
     out = [dict(entry) for entry in out]
+    apply_fit_sports(out, names)
     decorate(out)
     out.sort(key=lambda entry: entry.get('date') or '', reverse=True)
     written = previous != out

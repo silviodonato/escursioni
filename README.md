@@ -13,7 +13,7 @@ python3 -m unittest discover -p 'verify*.py'
 for check in verify_*.cjs; do node "$check"; done
 ```
 
-Copiare i propri GPX/TCX in `tracce/`, eseguire `python3 genera_indice.py` e avviare `python3 -m http.server`. Convertire i FIT in GPX; gli originali possono essere conservati accanto al file convertito. L’anteprima http.server mostra il sito in lettura; la gestione richiede CGI Python su DSM.
+Copiare i propri GPX/TCX in `tracce/`, eseguire `python3 genera_indice.py` e avviare `python3 -m http.server`. Convertire i FIT in GPX; gli originali possono essere conservati accanto al file convertito. Se accanto a un GPX c’è un FIT con lo stesso nome, il tipo di attività (kayak, corsa, escursione…) viene letto dal FIT, perché i GPX convertiti non lo contengono. L’anteprima http.server mostra il sito in lettura; la gestione richiede CGI Python su DSM.
 
 ## Struttura
 
