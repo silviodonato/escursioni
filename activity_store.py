@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import os, sys, csv, json, hashlib, stat, tempfile, fcntl, uuid, shutil
 
-from activity_config import STATE
+from activity_config import SITE, STATE
 KINDS = {'hiking':'Escursione','walking':'Camminata','running':'Corsa','cycling':'Ciclismo',
          'swimming':'Nuoto','skiing':'Sci','kayaking':'Kayak','sup':'SUP','surfing':'Surf',
          'elliptical':'Ellittica','workout':'Allenamento generico','other':'Altro'}
@@ -63,19 +63,31 @@ STRAVA_COLUMNS = (('nome attività','activity name'), ('tipo attività','activit
 STRAVA_POSITIONS = (2, 3, 12)  # column order of the Strava export, used if headers are unknown
 
 
-def strava_catalog(path=None):
-    """Names and types from the activities.csv of a Strava export, by file number.
+def strava_catalog(path=None, public=False):
+    """Names and types from a Strava export, by file number. Returns {} if missing or unreadable.
 
-    The CSV stays in the private folder: it also holds descriptions and private notes,
-    which are never read. Returns {} when the file is missing or unreadable."""
-    path = Path(path) if path else STATE / 'strava_activities.csv'
+    Looked up first in the private folder (the full activities.csv may stay there: only name,
+    type and file name are read), then in the site folder, where only a reduced file with
+    exactly those three columns is accepted, so descriptions and private notes are never public."""
+    if path is None:
+        private = STATE / 'strava_activities.csv'
+        if private.exists():
+            return strava_catalog(private)
+        return strava_catalog(SITE / 'strava_activities.csv', public=True)
+    path = Path(path)
     try:
         with path.open(encoding='utf-8-sig', newline='') as source:
             rows = csv.reader(source)
             header = [h.strip().casefold() for h in next(rows, [])]
+            if public and len(header) > len(STRAVA_COLUMNS):
+                print('{}: nella cartella pubblica servono solo nome, tipo e nome del file; '
+                      'file ignorato (contiene altre colonne)'.format(path), file=sys.stderr)
+                return {}
             columns = []
             for names, position in zip(STRAVA_COLUMNS, STRAVA_POSITIONS):
                 found = [header.index(n) for n in names if n in header]
+                if not found and public:
+                    return {}
                 columns.append(found[0] if found else position)
             catalog = {}
             for row in rows:

@@ -64,6 +64,28 @@ class Catalog(unittest.TestCase):
         self.path.write_bytes(b'\xff\xfe\x00broken')
         self.assertEqual(store.strava_catalog(self.path), {})
 
+    def test_public_folder_accepts_only_reduced_file(self):
+        full = export(ITALIAN, [italian_row('555', 'Pubblico', 'Kayak')])
+        self.path.write_text(full, encoding='utf-8')
+        self.assertEqual(store.strava_catalog(self.path, public=True), {})
+        self.path.write_text(export(['Nome attività', 'Tipo attività', 'Nome del file'],
+                                    [['Pubblico', 'Kayak', 'activities/555.fit.gz']]), encoding='utf-8')
+        self.assertEqual(store.strava_catalog(self.path, public=True), {'555': {'name': 'Pubblico', 'type': 'Kayak'}})
+        self.path.write_text(export(['a', 'b', 'c'], [['Pubblico', 'Kayak', '555.gpx']]), encoding='utf-8')
+        self.assertEqual(store.strava_catalog(self.path, public=True), {})
+
+    def test_default_locations(self):
+        private, site = Path(self.temporary.name) / 'private', Path(self.temporary.name) / 'site'
+        private.mkdir()
+        site.mkdir()
+        reduced = export(['Filename', 'Activity Name', 'Activity Type'], [['activities/7.gpx', 'Sito', 'Hike']])
+        with patch.object(store, 'STATE', private), patch.object(store, 'SITE', site):
+            self.assertEqual(store.strava_catalog(), {})
+            (site / 'strava_activities.csv').write_text(reduced, encoding='utf-8')
+            self.assertEqual(store.strava_catalog()['7']['name'], 'Sito')
+            (private / 'strava_activities.csv').write_text(export(ITALIAN, [italian_row('7', 'Privato', 'Corsa')]), encoding='utf-8')
+            self.assertEqual(store.strava_catalog()['7']['name'], 'Privato')
+
     def test_precedence(self):
         entry = {'file': 'a.gpx', 'name': '', 'sport': 'running', 'strava': {'name': 'Strava', 'type': 'Kayak'}}
         store.decorate([entry], {})
@@ -82,7 +104,7 @@ class GeneratorUsesStrava(unittest.TestCase):
         self.tracks, self.state = root / 'tracce', root / 'private'
         self.tracks.mkdir()
         self.state.mkdir()
-        self.patches = [patch.object(store, 'STATE', self.state),
+        self.patches = [patch.object(store, 'STATE', self.state), patch.object(store, 'SITE', root),
                         patch.multiple(g, HERE=str(root), TRACCE=str(self.tracks), OUT=str(self.tracks / 'index.json'))]
         original = g.write_index  # no Synology ACL outside the NAS
         self.patches.append(patch.object(g, 'write_index', side_effect=lambda entries, web_acl=False: original(entries, False)))

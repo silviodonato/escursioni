@@ -17,7 +17,12 @@ Copiare i propri GPX/TCX in `tracce/`, eseguire `python3 genera_indice.py` e avv
 
 ### Nomi e tipi da un export di Strava
 
-Copiare `activities.csv` dell’export di Strava nella cartella privata (`state_dir` di `site_config.json`; senza configurazione `~/.escursioni-library/`) con il nome `strava_activities.csv`, **mai in `tracce/` o nella directory web**: contiene anche descrizioni e note private. Al successivo aggiornamento dell’indice ogni file numerato come nell’export (`21295057161.gpx`, `.tcx`…) prende nome e tipo da Strava; vengono letti solo nome, tipo e nome del file. Nome e tipo scelti nella gestione restano prioritari; i tipi Strava senza corrispondenza (es. “Sport acquatico”) usano lo sport registrato dal dispositivo. Togliendo il file si torna ai nomi originali.
+Due possibilità, con il nome `strava_activities.csv`:
+
+- `activities.csv` completo dell’export nella cartella privata (`state_dir` di `site_config.json`; senza configurazione `~/.escursioni-library/`). Contiene anche descrizioni, note private e dati fisiologici: **mai in `tracce/` o nella directory web**.
+- Un file ridotto con le sole colonne `Nome attività`, `Tipo attività`, `Nome del file` (o `Activity Name`, `Activity Type`, `Filename`) nella cartella del sito, accanto a `genera_indice.py`. Qui un file con altre colonne viene ignorato.
+
+Il file privato ha la precedenza. Al successivo aggiornamento dell’indice ogni file numerato come nell’export (`21295057161.gpx`, `.tcx`…) prende nome e tipo da Strava; vengono letti solo nome, tipo e nome del file. Nome e tipo scelti nella gestione restano prioritari; i tipi Strava senza corrispondenza (es. “Sport acquatico”) usano lo sport registrato dal dispositivo. Togliendo il file si torna ai nomi originali.
 
 ## Struttura
 

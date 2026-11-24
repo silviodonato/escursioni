@@ -5,7 +5,7 @@ Solo libreria standard: funziona con il python3 di DSM."""
 import os, re, json, math, sys, hashlib, argparse, stat, subprocess, time
 from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
-from activity_store import decorate
+from activity_store import decorate, strava_catalog
 import activity_metrics
 
 from activity_config import SITE
@@ -235,6 +235,17 @@ def apply_fit_sports(entries, names):
             print('sport non letto da {}: {}'.format(fit, error), file=sys.stderr)
 
 
+def apply_strava(entries):
+    """Names and types from a Strava export (activities.csv in the private folder)."""
+    catalog = strava_catalog()
+    for entry in entries:
+        found = catalog.get(os.path.splitext(entry['file'])[0].casefold())
+        if found:
+            entry['strava'] = found
+        else:
+            entry.pop('strava', None)
+
+
 # Increase this when changing the track-statistics algorithm.
 CACHE_VERSION = 2
 
@@ -362,6 +373,7 @@ def main(web_acl=False, max_files=None, max_seconds=None):
                 out.append(cached)
     out = [dict(entry) for entry in out]
     apply_fit_sports(out, names)
+    apply_strava(out)
     decorate(out)
     out.sort(key=lambda entry: entry.get('date') or '', reverse=True)
     written = previous != out
